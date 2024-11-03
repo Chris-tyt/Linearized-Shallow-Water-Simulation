@@ -40,3 +40,5 @@ clean:
 	rm -f *.out
 	rm -f build/*
 	rm -f *.gif
+	rm -f *.txt
+	rm -f *.ncu-rep
