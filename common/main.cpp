@@ -3,6 +3,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+
+#ifdef CUDA
+#include <cuda_runtime.h>
+#endif
 #include <chrono>
 #include <iostream>
 
@@ -182,6 +186,10 @@ int main(int argc, char **argv)
         step();
     }
 
+#ifdef CUDA
+    cudaDeviceSynchronize();
+#endif
+
     auto exe_end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> exe_duration = exe_end - exe_start;
     std::cout << "execution time: " << exe_duration.count() << " seconds" << std::endl;
@@ -213,6 +221,10 @@ int main(int argc, char **argv)
             fclose(fptr);
         }
     }
+
+#ifdef MPI
+    MPI_Finalize();
+#endif
 
     return 0;
 }

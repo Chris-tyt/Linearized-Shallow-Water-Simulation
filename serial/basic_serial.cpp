@@ -35,14 +35,14 @@ void init(double *h0, double *u0, double *v0, double length_, double width_, int
     dv1 = (double *)calloc(nx * ny, sizeof(double));
 
     dh2 = (double *)calloc(nx * ny, sizeof(double));
-    du2 = (double *)calloc(ny * ny, sizeof(double));
+    du2 = (double *)calloc(nx * ny, sizeof(double));
     dv2 = (double *)calloc(nx * ny, sizeof(double));
 
     H = H_;
     g = g_;
 
     dx = length_ / nx;
-    dy = width_ / nx;
+    dy = width_ / ny;
 
     dt = dt_;
 }
