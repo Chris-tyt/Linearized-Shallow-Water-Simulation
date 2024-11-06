@@ -1,5 +1,6 @@
 CPP=CC
 CFLAGS=-lm -fopenmp
+COPTFLAGS=-O3 -ffast-math -flto -march=native -fprefetch-loop-arrays -funroll-loops -fno-math-errno
 OPTFLAGS=-O3 -ffast-math
 MPIFLAGS=-DMPI
 DEBUGFLAGS=-g -pg
