@@ -2,6 +2,7 @@
 #include <cuda_runtime.h>
 
 #include <math.h>
+#include <iostream>
 
 #include "../common/common.hpp"
 #include "../common/solver.hpp"
@@ -91,23 +92,71 @@ void swap_buffers()
     gpu_dv = gpu_tmp;
 }
 
+// __global__ void compute_ghost_horizontal_gpu(double *h, int nx, int ny)
+// {
+//     int index = threadIdx.x + blockDim.x * blockIdx.x;
+//     int stride = blockDim.x * gridDim.x;
+//     for (int j = index; j < ny; j += stride)
+//     {
+//         h(nx, j) = h(0, j);
+//     }
+// }
+
 __global__ void compute_ghost_horizontal_gpu(double *h, int nx, int ny)
 {
+    // 1. 声明共享内存，用于缓存全局内存的数据
+    extern __shared__ double shared_h[];
+
     int index = threadIdx.x + blockDim.x * blockIdx.x;
     int stride = blockDim.x * gridDim.x;
-    for (int j = index; j < ny; j += stride)
-    {
-        h(nx, j) = h(0, j);
+
+    // 2. 将全局内存中 h(0, j) 的值加载到共享内存中
+    if (index < ny) {
+        shared_h[threadIdx.x] = h(0, index);  // 假设 nx = 0 的数据加载到共享内存
+    }
+
+    // 3. 同步线程，确保共享内存中的数据加载完成
+    __syncthreads();
+
+    // 4. 将共享内存中的数据写到 h(nx, j)
+    for (int j = index; j < ny; j += stride) {
+        h(nx, j) = shared_h[threadIdx.x];
     }
 }
 
+
+// __global__ void compute_ghost_vertical_gpu(double *h, int nx, int ny)
+// {
+//     int index = threadIdx.x + blockDim.x * blockIdx.x;
+//     int stride = blockDim.x * gridDim.x;
+//     for (int i = index; i < nx; i += stride)
+//     {
+//         h(i, ny) = h(i, 0);
+//     }
+// }
+
 __global__ void compute_ghost_vertical_gpu(double *h, int nx, int ny)
 {
+    // 1. 声明共享内存
+    extern __shared__ double shared_h[];
+
     int index = threadIdx.x + blockDim.x * blockIdx.x;
     int stride = blockDim.x * gridDim.x;
+
+    // 2. 将 h(i, 0) 加载到共享内存中
+    if (index < nx)
+    {
+        shared_h[threadIdx.x] = h(index, 0);
+    }
+
+    // 3. 同步线程，确保所有线程都加载数据
+    __syncthreads();
+
+    // 4. 使用共享内存中的数据
     for (int i = index; i < nx; i += stride)
     {
-        h(i, ny) = h(i, 0);
+        // 使用共享内存中的数据来设置 h(i, ny)
+        h(i, ny) = shared_h[threadIdx.x];
     }
 }
 
@@ -168,10 +217,9 @@ __global__ void compute_dv_gpu(double *dv, double *h, double dx, double dy, int 
     }
 }
 
-__global__
-void update_fields_gpu(double* h, double* u, double* v, double* dh, double* du, double* dv,
-                       double* dh1, double* du1, double* dv1, double* dh2, double* du2, double* dv2,
-                       double a1, double a2, double a3, double dt, int nx, int ny)
+__global__ void update_fields_gpu(double *h, double *u, double *v, double *dh, double *du, double *dv,
+                                  double *dh1, double *du1, double *dv1, double *dh2, double *du2, double *dv2,
+                                  double a1, double a2, double a3, double dt, int nx, int ny)
 {
     // Calculate the initial position of the thread in the grid
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -182,8 +230,10 @@ void update_fields_gpu(double* h, double* u, double* v, double* dh, double* du, 
     int stride_y = blockDim.y * gridDim.y;
 
     // Loop over the elements using the stride
-    for (int x = i; x < nx; x += stride_x) {
-        for (int y = j; y < ny; y += stride_y) {
+    for (int x = i; x < nx; x += stride_x)
+    {
+        for (int y = j; y < ny; y += stride_y)
+        {
             h(x, y) += (a1 * dh(x, y) + a2 * dh1(x, y) + a3 * dh2(x, y)) * dt;
             u(x + 1, y) += (a1 * du(x, y) + a2 * du1(x, y) + a3 * du2(x, y)) * dt;
             v(x, y + 1) += (a1 * dv(x, y) + a2 * dv1(x, y) + a3 * dv2(x, y)) * dt;
@@ -230,9 +280,23 @@ void transfer(double *h_host)
  */
 void step()
 {
-    int blockSize = 256;
+    // cudaDeviceProp prop;
+    // cudaGetDeviceProperties(&prop, 0); // 获取第一个 GPU 的信息
+
+    // int maxThreadsPerBlock = prop.maxThreadsPerBlock; // 每个线程块的最大线程数
+    // int sharedMemPerBlock = prop.sharedMemPerBlock;   // 每个块的共享内存大小
+    // int warpSize = prop.warpSize;                     // Warp 大小，一般为 32
+    // int multiProcessor = prop.multiProcessorCount;    // SM数量
+
+    // std::cout<<maxThreadsPerBlock<<"--"<<sharedMemPerBlock<<"--"<<warpSize<<"--"<<multiProcessor<<std::endl;
+
+    int blockSize = 32;
     int numBlocks;
+    // int numBlocks = (nx * ny + blockSize - 1) / blockSize;
     cudaDeviceGetAttribute(&numBlocks, cudaDevAttrMultiProcessorCount, 0);
+
+    // int numB_x = (nx + blockSize - 1) / blockSize;
+    // int numB_y = (ny + blockSize - 1) / blockSize;
 
     dim3 blockSize_2D(16, 16);
     // dim3 numBlocks_2D(numBlocks * 32, numBlocks * 32);
@@ -267,18 +331,16 @@ void step()
         a3 = 5.0 / 12.0;
     }
 
-    // Finally, compute the next time step using multistep method  
+    // Finally, compute the next time step using multistep method
     update_fields_gpu<<<numBlocks_2D, blockSize_2D>>>(gpu_h, gpu_u, gpu_v, gpu_dh, gpu_du, gpu_dv,
-                                                  gpu_dh1, gpu_du1, gpu_dv1,
-                                                  gpu_dh2, gpu_du2, gpu_dv2,
-                                                  a1, a2, a3, dt, nx, ny);
-    
+                                                      gpu_dh1, gpu_du1, gpu_dv1,
+                                                      gpu_dh2, gpu_du2, gpu_dv2,
+                                                      a1, a2, a3, dt, nx, ny);
 
     // We compute the boundaries for our fields, as they are (1) needed for
     // the next time step, and (2) aren't explicitly set in our multistep method
     compute_boundaries_horizontal_gpu<<<numBlocks, blockSize>>>(gpu_u, nx, ny);
-    compute_boundaries_horizontal_gpu<<<numBlocks, blockSize>>>(gpu_v, nx, ny);
-    
+    compute_boundaries_vertical_gpu<<<numBlocks, blockSize>>>(gpu_v, nx, ny);
 
     // We swap the buffers for our derivatives so that we can use the derivatives
     // from the previous time steps in our multistep method, then increment
@@ -290,7 +352,6 @@ void step()
 
     t++;
 }
-
 
 /**
  * This is your finalization function! You should free all of the memory that you

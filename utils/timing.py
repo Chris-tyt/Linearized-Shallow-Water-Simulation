@@ -9,7 +9,8 @@ from subprocess import run, PIPE
 
 num_iters = 10000
 
-serial_sizes = [ 100, 250, 500, 750, 1000 ]
+# serial_sizes = [ 100, 250, 500, 750, 1000 ]
+serial_sizes = [ 100, 250]
 gpu_sizes = [ 100, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000 ]
 
 mpi_size_strong = 2048
@@ -28,6 +29,7 @@ def time(time_type, executable_name, sizes):
         print(f"Timing {time_type} size {size}")
         command = [executable_name, "--nx", str(size), "--ny", str(size), "--num_iter", str(num_iters)]
         result = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+        print(result)
         
         init_time = re.search(r"Initialization time for rank 0: (\d+\.\d+)", result.stderr).group(1)
         exec_time = re.search(r"Execution time for rank 0: (\d+\.\d+)", result.stderr).group(1)
