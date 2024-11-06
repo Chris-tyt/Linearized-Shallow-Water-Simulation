@@ -1,5 +1,7 @@
 #define h(i, j) h[(i) * (ny + 1) + (j)]
+#define h_all(i, j) h_all[(i) * (ny + 1) + (j)]
 #define u(i, j) u[(i) * (ny) + (j)]
+#define u_all(i, j) u_all[(i) * (ny) + (j)]
 #define v(i, j) v[(i) * (ny + 1) + (j)]
 
 #define dh(i, j) dh[(i) * ny + (j)]
