@@ -134,17 +134,17 @@ int main(int argc, char **argv)
         }
     }
 
-    // clock_t init_start = clock();
-    auto init_start = std::chrono::high_resolution_clock::now();
+    clock_t init_start = clock();
+    // auto init_start = std::chrono::high_resolution_clock::now();
 
     init(h, u, v, length, width, nx, ny, depth, g, dt, rank, num_procs);
 
-    auto init_end = std::chrono::high_resolution_clock::now();
+    // auto init_end = std::chrono::high_resolution_clock::now();
 
-    std::chrono::duration<double> init_duration = init_end - init_start;
-    std::cout << "init time: " << init_duration.count() << " seconds" << std::endl;
-    // clock_t init_end = clock();
-    // fprintf(stderr, "Initialization time for rank %d: %f\n", rank, (double)(init_end - init_start) / CLOCKS_PER_SEC);
+    // std::chrono::duration<double> init_duration = init_end - init_start;
+    // std::cout << "init time: " << init_duration.count() << " seconds" << std::endl;
+    clock_t init_end = clock();
+    fprintf(stderr, "Initialization time for rank %d: %f\n", rank, (double)(init_end - init_start) / CLOCKS_PER_SEC);
 
     FILE *fptr;
 
@@ -168,8 +168,8 @@ int main(int argc, char **argv)
         fwrite(&save_iter, sizeof(int), 1, fptr);
     }
 
-    // clock_t start = clock();
-    auto exe_start = std::chrono::high_resolution_clock::now();
+    clock_t start = clock();
+    // auto exe_start = std::chrono::high_resolution_clock::now();
 
     for (int i = 0; i < num_iterations; i++)
     {
@@ -190,25 +190,25 @@ int main(int argc, char **argv)
     cudaDeviceSynchronize();
 #endif
 
-    auto exe_end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> exe_duration = exe_end - exe_start;
-    std::cout << "execution time: " << exe_duration.count() << " seconds" << std::endl;
+    // auto exe_end = std::chrono::high_resolution_clock::now();
+    // std::chrono::duration<double> exe_duration = exe_end - exe_start;
+    // std::cout << "execution time: " << exe_duration.count() << " seconds" << std::endl;
 
-    // clock_t end = clock();
-    // fprintf(stderr, "Execution time for rank %d: %f\n", rank, (double)(end - start) / CLOCKS_PER_SEC);
+    clock_t end = clock();
+    fprintf(stderr, "Execution time for rank %d: %f\n", rank, (double)(end - start) / CLOCKS_PER_SEC);
 
 #ifdef MPI
     MPI_Finalize();
 #endif
 
-    // clock_t free_start = clock();
-    auto free_start = std::chrono::high_resolution_clock::now();
+    clock_t free_start = clock();
+    // auto free_start = std::chrono::high_resolution_clock::now();
     free_memory();
-    auto free_end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> free_duration = free_end - free_start;
-    std::cout << "free time: " << free_duration.count() << " seconds" << std::endl;
-    // clock_t free_end = clock();
-    // fprintf(stderr, "Free memory time for rank %d: %f\n", rank, (double)(free_end - free_start) / CLOCKS_PER_SEC);
+    // auto free_end = std::chrono::high_resolution_clock::now();
+    // std::chrono::duration<double> free_duration = free_end - free_start;
+    // std::cout << "free time: " << free_duration.count() << " seconds" << std::endl;
+    clock_t free_end = clock();
+    fprintf(stderr, "Free memory time for rank %d: %f\n", rank, (double)(free_end - free_start) / CLOCKS_PER_SEC);
 
     if (rank == 0)
     {
