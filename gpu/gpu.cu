@@ -92,77 +92,104 @@ void swap_buffers()
     gpu_dv = gpu_tmp;
 }
 
-// __global__ void compute_ghost_horizontal_gpu(double *h, int nx, int ny)
-// {
-//     int index = threadIdx.x + blockDim.x * blockIdx.x;
-//     int stride = blockDim.x * gridDim.x;
-//     for (int j = index; j < ny; j += stride)
-//     {
-//         h(nx, j) = h(0, j);
-//     }
-// }
-
 __global__ void compute_ghost_horizontal_gpu(double *h, int nx, int ny)
 {
-    // 1. 声明共享内存，用于缓存全局内存的数据
-    extern __shared__ double shared_h[];
-
     int index = threadIdx.x + blockDim.x * blockIdx.x;
     int stride = blockDim.x * gridDim.x;
-
-    // 2. 将全局内存中 h(0, j) 的值加载到共享内存中
-    if (index < ny) {
-        shared_h[threadIdx.x] = h(0, index);  // 假设 nx = 0 的数据加载到共享内存
+    for (int j = index; j < ny; j += stride)
+    {
+        h(nx, j) = h(0, j);
     }
-
-    // 3. 同步线程，确保共享内存中的数据加载完成
-    __syncthreads();
-
-    // 4. 将共享内存中的数据写到 h(nx, j)
-    for (int j = index; j < ny; j += stride) {
-        h(nx, j) = shared_h[threadIdx.x];
-    }
+    
 }
 
-
-// __global__ void compute_ghost_vertical_gpu(double *h, int nx, int ny)
+// __global__ void compute_ghost_horizontal_gpu(double *h, int nx, int ny)
 // {
+//     // 1. 声明共享内存，用于缓存全局内存的数据
+//     extern __shared__ double shared_h[];
+
 //     int index = threadIdx.x + blockDim.x * blockIdx.x;
 //     int stride = blockDim.x * gridDim.x;
-//     for (int i = index; i < nx; i += stride)
-//     {
-//         h(i, ny) = h(i, 0);
+
+//     // 2. 将全局内存中 h(0, j) 的值加载到共享内存中
+//     if (index < ny) {
+//         shared_h[threadIdx.x] = h(0, index);  // 假设 nx = 0 的数据加载到共享内存
+//     }
+
+//     // 3. 同步线程，确保共享内存中的数据加载完成
+//     __syncthreads();
+
+//     // 4. 将共享内存中的数据写到 h(nx, j)
+//     for (int j = index; j < ny; j += stride) {
+//         h(nx, j) = shared_h[threadIdx.x];
 //     }
 // }
+
 
 __global__ void compute_ghost_vertical_gpu(double *h, int nx, int ny)
 {
-    // 1. 声明共享内存
-    extern __shared__ double shared_h[];
-
     int index = threadIdx.x + blockDim.x * blockIdx.x;
     int stride = blockDim.x * gridDim.x;
-
-    // 2. 将 h(i, 0) 加载到共享内存中
-    if (index < nx)
-    {
-        shared_h[threadIdx.x] = h(index, 0);
-    }
-
-    // 3. 同步线程，确保所有线程都加载数据
-    __syncthreads();
-
-    // 4. 使用共享内存中的数据
     for (int i = index; i < nx; i += stride)
     {
-        // 使用共享内存中的数据来设置 h(i, ny)
-        h(i, ny) = shared_h[threadIdx.x];
+        h(i, ny) = h(i, 0);
     }
 }
 
+// __global__ void compute_ghost_vertical_gpu(double *h, int nx, int ny)
+// {
+//     // 1. 声明共享内存
+//     extern __shared__ double shared_h[];
+
+//     int index = threadIdx.x + blockDim.x * blockIdx.x;
+//     int stride = blockDim.x * gridDim.x;
+
+//     // 2. 将 h(i, 0) 加载到共享内存中
+//     if (index < nx)
+//     {
+//         shared_h[threadIdx.x] = h(index, 0);
+//     }
+
+//     // 3. 同步线程，确保所有线程都加载数据
+//     __syncthreads();
+
+//     // 4. 使用共享内存中的数据
+//     for (int i = index; i < nx; i += stride)
+//     {
+//         // 使用共享内存中的数据来设置 h(i, ny)
+//         h(i, ny) = shared_h[threadIdx.x];
+//     }
+// }
+
+// __global__ void compute_dh_gpu(double *dh, double *u, double *v, double dx, double dy, int nx, int ny, double H)
+// {
+//     // get index
+//     int i = blockIdx.x * blockDim.x + threadIdx.x;
+//     int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+//     // get stride
+//     int stride_x = blockDim.x * gridDim.x;
+//     int stride_y = blockDim.y * gridDim.y;
+
+//     for (int x = i; x < nx; x += stride_x)
+//     {
+//         for (int y = j; y < ny; y += stride_y)
+//         {
+//             dh(i, j) = -H * (du_dx(i, j) + dv_dy(i, j));
+//         }
+//     }
+// }
+
+
 __global__ void compute_dh_gpu(double *dh, double *u, double *v, double dx, double dy, int nx, int ny, double H)
 {
-    // get index
+    const int BLOCK_DIM_X = 16;
+    const int BLOCK_DIM_Y = 16;
+    // 声明共享内存
+    __shared__ double u_shared[BLOCK_DIM_X + 1][BLOCK_DIM_Y];
+    __shared__ double v_shared[BLOCK_DIM_X][BLOCK_DIM_Y + 1];
+
+    // 获取线程在全局和块中的索引
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -170,13 +197,41 @@ __global__ void compute_dh_gpu(double *dh, double *u, double *v, double dx, doub
     int stride_x = blockDim.x * gridDim.x;
     int stride_y = blockDim.y * gridDim.y;
 
+    // 将全局内存数据加载到共享内存
+    // if (i < nx && j < ny)
+    // {
+    //     u_shared[threadIdx.x][threadIdx.y] = u(i, j);
+    //     v_shared[threadIdx.x][threadIdx.y] = v(i, j);
+    // }
     for (int x = i; x < nx; x += stride_x)
     {
         for (int y = j; y < ny; y += stride_y)
         {
-            dh(i, j) = -H * (du_dx(i, j) + dv_dy(i, j));
+            u_shared[threadIdx.x][threadIdx.y] = u(i, j);
+            v_shared[threadIdx.x][threadIdx.y] = v(i, j);
+
+            // 处理边界情况
+            if (((threadIdx.x == blockDim.x - 1) || x==nx-1)  && x + 1 <= nx) {
+                u_shared[threadIdx.x + 1][threadIdx.y] = u(x + 1, y);
+            }
+            if (((threadIdx.y == blockDim.y -1) || y==ny-1)  && y + 1 <= ny) {
+                v_shared[threadIdx.x][threadIdx.y + 1] = v(x, y + 1);
+            }
         }
     }
+    
+    __syncthreads();
+
+    // 计算 dh
+    for (int x = i; x < nx; x += stride_x)
+    {
+        for (int y = j; y < ny; y += stride_y)
+        {
+            dh(x, y) = -H * ((u_shared[threadIdx.x + 1][threadIdx.y] - u_shared[threadIdx.x][threadIdx.y]) / dx +
+                            (v_shared[threadIdx.x][threadIdx.y + 1] - v_shared[threadIdx.x][threadIdx.y]) / dy);
+        }
+    }
+    
 }
 
 __global__ void compute_du_gpu(double *du, double *h, double dx, double dy, int nx, int ny, double g)
