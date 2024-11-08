@@ -6,6 +6,8 @@ nx=10000
 ny=10000
 niter=10000
 make $mod
+# srun -N 2 ./build/${mod} --nx ${nx} --ny ${ny} --num_iter ${niter} --scenario ${scenario} --output ${mod}.out
+# python utils/visualizer.py ${mod}.out ${mod}.gif
 srun ./build/${mod} --nx ${nx} --ny ${ny} --num_iter ${niter} --scenario ${scenario} --output ${mod}.out
 # python utils/visualizer.py ${mod}.out ${mod}.gif
 

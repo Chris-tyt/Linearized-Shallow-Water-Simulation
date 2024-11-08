@@ -197,10 +197,6 @@ int main(int argc, char **argv)
     clock_t end = clock();
     fprintf(stderr, "Execution time for rank %d: %f\n", rank, (double)(end - start) / CLOCKS_PER_SEC);
 
-#ifdef MPI
-    MPI_Finalize();
-#endif
-
     clock_t free_start = clock();
     // auto free_start = std::chrono::high_resolution_clock::now();
     free_memory();
