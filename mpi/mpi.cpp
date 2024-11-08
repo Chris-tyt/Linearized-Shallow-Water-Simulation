@@ -4,6 +4,7 @@
 // #include <cstring>
 #include <string>
 #include <iostream>
+#include <omp.h>
 
 #include "../common/common.hpp"
 #include "../common/solver.hpp"
@@ -85,6 +86,11 @@ void print_vec_d(const std::string &s, const double *x, const int size)
  */
 void init(double *h0, double *u0, double *v0, double length_, double width_, int nx_, int ny_, double H_, double g_, double dt_, int rank_, int num_procs_)
 {
+    // set thread num
+    int num_thread = omp_get_num_procs();
+    omp_set_num_threads(num_thread < 64 ? num_thread : 64);
+    std::cout<<"num_thread"<<num_thread<<std::endl;
+
     // Initialize MPI and distribute data among processes
     rank = rank_;
     num_procs = num_procs_;
@@ -186,6 +192,7 @@ void init(double *h0, double *u0, double *v0, double length_, double width_, int
  */
 void compute_dh()
 {
+    #pragma omp parallel for
     for (int i = 0; i < nx; i++)
     {
         for (int j = 0; j < ny; j++)
@@ -203,6 +210,7 @@ void compute_dh()
  */
 void compute_du()
 {
+    #pragma omp parallel for
     for (int i = 0; i < nx; i++)
     {
         for (int j = 0; j < ny; j++)
@@ -220,6 +228,7 @@ void compute_du()
  */
 void compute_dv()
 {
+    #pragma omp parallel for
     for (int i = 0; i < nx; i++)
     {
         for (int j = 0; j < ny; j++)
@@ -236,6 +245,7 @@ void compute_dv()
  */
 void multistep(double a1, double a2, double a3)
 {
+    #pragma omp parallel for collapse (2)
     for (int i = 0; i < nx; i++)
     {
         for (int j = 0; j < ny; j++)
@@ -253,6 +263,7 @@ void multistep(double a1, double a2, double a3)
  */
 void compute_ghost_horizontal()
 {
+    #pragma omp parallel for
     for (int j = 0; j < ny; j++)
     {
         h(nx, j) = h_all(0, j);
@@ -265,6 +276,7 @@ void compute_ghost_horizontal()
  */
 void compute_ghost_vertical()
 {
+    #pragma omp parallel for
     for (int i = 0; i < nx; i++)
     {
         h(i, ny) = h(i, 0);
@@ -277,6 +289,7 @@ void compute_ghost_vertical()
  */
 void compute_boundaries_horizontal()
 {
+    #pragma omp parallel for
     for (int j = 0; j < ny; j++)
     {
         u_all(0, j) = u(nx, j);
@@ -289,6 +302,7 @@ void compute_boundaries_horizontal()
  */
 void compute_boundaries_vertical()
 {
+    #pragma omp parallel for
     for (int i = 0; i < nx; i++)
     {
         v(i, 0) = v(i, ny);
