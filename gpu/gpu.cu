@@ -111,6 +111,30 @@ __global__ void compute_ghost_vertical_gpu(double *h, int nx, int ny)
     }
 }
 
+__global__ void compute_dhuv_gpu(double *dh, double *du, double *dv,
+                                 double *h, double *u, double *v,
+                                 double dx, double dy, int nx, int ny,
+                                 double H, double g)
+{
+    // get index
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+
+    // get stride
+    int stride_x = blockDim.x * gridDim.x;
+    int stride_y = blockDim.y * gridDim.y;
+
+    for (int x = i; x < nx; x += stride_x)
+    {
+        for (int y = j; y < ny; y += stride_y)
+        {
+            dh(x, y) = -H * (du_dx(x, y) + dv_dy(x, y));
+            du(x, y) = -g * dh_dx(x, y);
+            dv(x, y) = -g * dh_dy(x, y);
+        }
+    }
+}
+
 __global__ void compute_dh_gpu(double *dh, double *u, double *v, double dx, double dy, int nx, int ny, double H)
 {
     // get index
@@ -244,9 +268,10 @@ void step()
     compute_ghost_vertical_gpu<<<numBlocks, blockSize>>>(gpu_h, nx, ny);
 
     // Next, compute the derivatives of fields
-    compute_dh_gpu<<<numBlocks_2D, blockSize_2D>>>(gpu_dh, gpu_u, gpu_v, dx, dy, nx, ny, H);
-    compute_du_gpu<<<numBlocks_2D, blockSize_2D>>>(gpu_du, gpu_h, dx, dy, nx, ny, g);
-    compute_dv_gpu<<<numBlocks_2D, blockSize_2D>>>(gpu_dv, gpu_h, dx, dy, nx, ny, g);
+    compute_dhuv_gpu<<<numBlocks_2D, blockSize_2D>>>(gpu_dh, gpu_du, gpu_dv, gpu_h, gpu_u, gpu_v, dx, dy, nx, ny, H, g);
+    // compute_dh_gpu<<<numBlocks_2D, blockSize_2D>>>(gpu_dh, gpu_u, gpu_v, dx, dy, nx, ny, H);
+    // compute_du_gpu<<<numBlocks_2D, blockSize_2D>>>(gpu_du, gpu_h, dx, dy, nx, ny, g);
+    // compute_dv_gpu<<<numBlocks_2D, blockSize_2D>>>(gpu_dv, gpu_h, dx, dy, nx, ny, g);
 
     // We set the coefficients for our multistep method
     double a1, a2, a3;
