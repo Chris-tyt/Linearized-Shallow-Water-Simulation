@@ -114,8 +114,8 @@ __global__ void compute_ghost_vertical_gpu(double *h, int nx, int ny)
 __global__ void compute_dh_gpu(double *dh, double *u, double *v, double dx, double dy, int nx, int ny, double H)
 {
     // get index
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
 
     // get stride
     int stride_x = blockDim.x * gridDim.x;
@@ -133,8 +133,8 @@ __global__ void compute_dh_gpu(double *dh, double *u, double *v, double dx, doub
 __global__ void compute_du_gpu(double *du, double *h, double dx, double dy, int nx, int ny, double g)
 {
     // get index
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
 
     // get stride
     int stride_x = blockDim.x * gridDim.x;
@@ -152,8 +152,8 @@ __global__ void compute_du_gpu(double *du, double *h, double dx, double dy, int 
 __global__ void compute_dv_gpu(double *dv, double *h, double dx, double dy, int nx, int ny, double g)
 {
     // get index
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
 
     // get stride
     int stride_x = blockDim.x * gridDim.x;
@@ -163,27 +163,28 @@ __global__ void compute_dv_gpu(double *dv, double *h, double dx, double dy, int 
     {
         for (int y = j; y < ny; y += stride_y)
         {
-            dv((x, y) = -g * dh_dy(x, y);
+            dv(x, y) = -g * dh_dy(x, y);
         }
     }
 }
 
-__global__
-void update_fields_gpu(double* h, double* u, double* v, double* dh, double* du, double* dv,
-                       double* dh1, double* du1, double* dv1, double* dh2, double* du2, double* dv2,
-                       double a1, double a2, double a3, double dt, int nx, int ny)
+__global__ void update_fields_gpu(double *h, double *u, double *v, double *dh, double *du, double *dv,
+                                  double *dh1, double *du1, double *dv1, double *dh2, double *du2, double *dv2,
+                                  double a1, double a2, double a3, double dt, int nx, int ny)
 {
     // Calculate the initial position of the thread in the grid
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
 
     // Calculate the stride for both x and y directions
     int stride_x = blockDim.x * gridDim.x;
     int stride_y = blockDim.y * gridDim.y;
 
     // Loop over the elements using the stride
-    for (int x = i; x < nx; x += stride_x) {
-        for (int y = j; y < ny; y += stride_y) {
+    for (int x = i; x < nx; x += stride_x)
+    {
+        for (int y = j; y < ny; y += stride_y)
+        {
             h(x, y) += (a1 * dh(x, y) + a2 * dh1(x, y) + a3 * dh2(x, y)) * dt;
             u(x + 1, y) += (a1 * du(x, y) + a2 * du1(x, y) + a3 * du2(x, y)) * dt;
             v(x, y + 1) += (a1 * dv(x, y) + a2 * dv1(x, y) + a3 * dv2(x, y)) * dt;
@@ -236,7 +237,6 @@ void step()
 
     dim3 blockSize_2D(16, 16);
     // dim3 numBlocks_2D(numBlocks * 32, numBlocks * 32);
-    dim3 numBlocks_2D(numBlocks, numBlocks);
 
     // First
     compute_ghost_horizontal_gpu<<<numBlocks, blockSize>>>(gpu_h, nx, ny);
@@ -267,18 +267,16 @@ void step()
         a3 = 5.0 / 12.0;
     }
 
-    // Finally, compute the next time step using multistep method  
+    // Finally, compute the next time step using multistep method
     update_fields_gpu<<<numBlocks_2D, blockSize_2D>>>(gpu_h, gpu_u, gpu_v, gpu_dh, gpu_du, gpu_dv,
-                                                  gpu_dh1, gpu_du1, gpu_dv1,
-                                                  gpu_dh2, gpu_du2, gpu_dv2,
-                                                  a1, a2, a3, dt, nx, ny);
-    
+                                                      gpu_dh1, gpu_du1, gpu_dv1,
+                                                      gpu_dh2, gpu_du2, gpu_dv2,
+                                                      a1, a2, a3, dt, nx, ny);
 
     // We compute the boundaries for our fields, as they are (1) needed for
     // the next time step, and (2) aren't explicitly set in our multistep method
     compute_boundaries_horizontal_gpu<<<numBlocks, blockSize>>>(gpu_u, nx, ny);
     compute_boundaries_horizontal_gpu<<<numBlocks, blockSize>>>(gpu_v, nx, ny);
-    
 
     // We swap the buffers for our derivatives so that we can use the derivatives
     // from the previous time steps in our multistep method, then increment
@@ -290,7 +288,6 @@ void step()
 
     t++;
 }
-
 
 /**
  * This is your finalization function! You should free all of the memory that you
