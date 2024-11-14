@@ -125,7 +125,7 @@ __global__ void compute_dh_gpu(double *dh, double *u, double *v, double dx, doub
     {
         for (int y = j; y < ny; y += stride_y)
         {
-            dh(i, j) = -H * (du_dx(i, j) + dv_dy(i, j));
+            dh(x, y) = -H * (du_dx(x, y) + dv_dy(x, y));
         }
     }
 }
@@ -144,7 +144,7 @@ __global__ void compute_du_gpu(double *du, double *h, double dx, double dy, int 
     {
         for (int y = j; y < ny; y += stride_y)
         {
-            du(i, j) = -g * dh_dx(i, j);
+            du(x, y) = -g * dh_dx(x, y);
         }
     }
 }
@@ -163,7 +163,7 @@ __global__ void compute_dv_gpu(double *dv, double *h, double dx, double dy, int 
     {
         for (int y = j; y < ny; y += stride_y)
         {
-            dv(i, j) = -g * dh_dy(i, j);
+            dv((x, y) = -g * dh_dy(x, y);
         }
     }
 }
