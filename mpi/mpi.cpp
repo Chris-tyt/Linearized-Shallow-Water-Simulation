@@ -103,7 +103,7 @@ void init(double *h0, double *u0, double *v0, double length_, double width_, int
 
     dt = dt_;
 
-    print_int("nx_all-ny", nx_all, ny_);
+    // print_int("nx_all-ny", nx_all, ny_);
 
     // We set the pointers to the arrays that were passed in
     if (rank == 0)
@@ -155,7 +155,7 @@ void init(double *h0, double *u0, double *v0, double length_, double width_, int
 
     nx_in = nx + 1;
 
-    print_int("nx_nxin", nx, nx_in);
+    // print_int("nx_nxin", nx, nx_in);
 
     h = (double *)calloc(nx_in * (ny + 1), sizeof(double));
     u = (double *)calloc(nx_in * ny, sizeof(double));
