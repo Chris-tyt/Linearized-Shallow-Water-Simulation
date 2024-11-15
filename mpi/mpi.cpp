@@ -8,6 +8,9 @@
 #include "../common/common.hpp"
 #include "../common/solver.hpp"
 
+#define h_all(i, j) h_all[(i) * (ny + 1) + (j)]
+#define u_all(i, j) u_all[(i) * (ny) + (j)]
+
 // Here we hold the number of cells we have in the x and y directions
 // rank 0 data
 int nx_all;
