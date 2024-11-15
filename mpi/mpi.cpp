@@ -12,12 +12,21 @@
 // rank 0 data
 int nx_all;
 double *h_all, *v_all, *u_all;
-int *sendcounts = nullptr;
-int *displs = nullptr;
+int *sendcounts_h = nullptr;
+int *sendcounts_u = nullptr;
+int *sendcounts_v = nullptr;
 
-int *recvcounts = nullptr;
-int *recdispls = nullptr;
-int *recdispls_hv = nullptr;
+int *displs_h = nullptr;
+int *displs_u = nullptr;
+int *displs_v = nullptr;
+
+int *recvcounts_h = nullptr;
+int *recvcounts_u = nullptr;
+int *recvcounts_v = nullptr;
+
+int *recdispls_h = nullptr;
+int *recdispls_u = nullptr;
+int *recdispls_v = nullptr;
 
 // This is where all of our points are. We need to keep track of our active
 // height and velocity grids, but also the corresponding derivatives. The reason
@@ -49,7 +58,7 @@ void print_double(const std::string &s, const double x1, const double x2 = -1000
 
 void print_vec(const std::string &s, const int *x, const int size)
 {
-    std::cout << "print " << s << ", rank=" << rank << ", ";
+    std::cout << "print " << s << ", rank=" << rank << ": ";
     for (int i = 0; i < size; i++)
         std::cout << x[i] << ", ";
     std::cout << std::endl;
@@ -57,7 +66,7 @@ void print_vec(const std::string &s, const int *x, const int size)
 
 void print_vec_d(const std::string &s, const double *x, const int size)
 {
-    std::cout << "print " << s << ", rank=" << rank << ", ";
+    std::cout << "print " << s << ", rank=" << rank << ": ";
     for (int i = 0; i < size; i++)
         std::cout << x[i] << ", ";
     std::cout << std::endl;
@@ -102,20 +111,37 @@ void init(double *h0, double *u0, double *v0, double length_, double width_, int
 
         // memcpy(&h_all[nx_all * (ny + 1)], &h_all[0], sizeof(double) * (ny + 1));
         // Scatter the data from rank 0 to all processes
-        sendcounts = (int *)malloc(num_procs * sizeof(int));
-        displs = (int *)malloc(num_procs * sizeof(int));
+        sendcounts_h = (int *)malloc(num_procs * sizeof(int));
+        sendcounts_u = (int *)malloc(num_procs * sizeof(int));
+        sendcounts_v = (int *)malloc(num_procs * sizeof(int));
+        displs_h = (int *)malloc(num_procs * sizeof(int));
+        displs_u = (int *)malloc(num_procs * sizeof(int));
+        displs_v = (int *)malloc(num_procs * sizeof(int));
 
         int offset = 0;
         for (int i = 1; i < num_procs; ++i)
         {
             int temp_nx = nx_all / num_procs + (nx_all % num_procs > (i - 1) ? 1 : 0);
-            sendcounts[i] = (temp_nx + 1) * (ny + 1);
-            displs[i] = (offset) * (ny + 1);
+
+            sendcounts_h[i] = (temp_nx + 1) * (ny + 1);
+            sendcounts_u[i] = (temp_nx + 1) * ny;
+            sendcounts_v[i] = temp_nx * (ny + 1);
+
+            displs_h[i] = offset * (ny + 1);
+            displs_u[i] = offset * ny;
+            displs_v[i] = offset * (ny + 1);
+
             offset += temp_nx;
         }
         nx = nx_all / num_procs;
-        sendcounts[0] = (nx + 1) * (ny + 1);
-        displs[0] = offset;
+        sendcounts_h[0] = (nx + 1) * (ny + 1);
+        sendcounts_u[0] = (nx + 1) * ny;
+        sendcounts_v[0] = nx * (ny + 1);
+        displs_h[0] = offset * (ny + 1);
+        displs_u[0] = offset * ny;
+        displs_v[0] = offset * (ny + 1);
+        // print_vec("sec", sendcounts, num_procs);
+        // print_vec("dis", displs, num_procs);
     }
 
     // We allocate memory for the local arrays for each process
@@ -123,13 +149,14 @@ void init(double *h0, double *u0, double *v0, double length_, double width_, int
     {
         nx = nx_all / num_procs + (nx_all % num_procs > rank - 1 ? 1 : 0);
     }
+
     nx_in = nx + 1;
 
     print_int("nx_nxin", nx, nx_in);
 
     h = (double *)calloc(nx_in * (ny + 1), sizeof(double));
-    u = (double *)calloc(nx_in * (ny + 1), sizeof(double));
-    v = (double *)calloc(nx_in * (ny + 1), sizeof(double));
+    u = (double *)calloc(nx_in * ny, sizeof(double));
+    v = (double *)calloc(nx * (ny + 1), sizeof(double));
 
     dh = (double *)calloc(nx * ny, sizeof(double));
     du = (double *)calloc(nx * ny, sizeof(double));
@@ -143,10 +170,6 @@ void init(double *h0, double *u0, double *v0, double length_, double width_, int
     du2 = (double *)calloc(nx * ny, sizeof(double));
     dv2 = (double *)calloc(nx * ny, sizeof(double));
 
-    // print_int("num_pro", num_procs);
-
-    // print_vec("sc", sendcounts, num_procs);
-    // print_vec("dis", displs, num_procs);
     // print_vec_d("h", h, 9);
 }
 
@@ -313,24 +336,33 @@ void gather()
 {
     if (rank == 0)
     {
-        recvcounts = (int *)malloc(num_procs * sizeof(int));
-        recdispls = (int *)malloc(num_procs * sizeof(int));
-        recdispls_hv = (int *)malloc(num_procs * sizeof(int));
+        recvcounts_h = (int *)malloc(num_procs * sizeof(int));
+        recvcounts_u = (int *)malloc(num_procs * sizeof(int));
+        recvcounts_v = (int *)malloc(num_procs * sizeof(int));
+        recdispls_h = (int *)malloc(num_procs * sizeof(int));
+        recdispls_u = (int *)malloc(num_procs * sizeof(int));
+        recdispls_v = (int *)malloc(num_procs * sizeof(int));
 
         int offset = 0;
         for (int i = 1; i < num_procs; ++i)
         {
             int temp_nx = nx_all / num_procs + (nx_all % num_procs > (i - 1) ? 1 : 0);
-            recvcounts[i] = temp_nx * (ny + 1);
-            recdispls[i] = (offset+1) * (ny + 1);
-            recdispls_hv[i] = offset * (ny + 1);
+            recvcounts_h[i] = temp_nx * (ny + 1);
+            recvcounts_u[i] = temp_nx * ny;
+            recvcounts_v[i] = temp_nx * (ny + 1);
+            recdispls_h[i] = offset * (ny + 1);
+            recdispls_u[i] = (offset + 1) * ny;
+            recdispls_v[i] = offset * (ny + 1);
             offset += temp_nx;
         }
 
         nx_out = nx_all / num_procs;
-        recvcounts[0] = nx_out * (ny + 1);
-        recdispls[0] = (offset + 1)* (ny + 1);
-        recdispls_hv[0] = offset* (ny + 1);
+        recvcounts_h[0] = nx_out * (ny + 1);
+        recvcounts_u[0] = nx_out * ny;
+        recvcounts_v[0] = nx_out * (ny + 1);
+        recdispls_h[0] = offset * (ny + 1);
+        recdispls_u[0] = (offset + 1) * ny;
+        recdispls_v[0] = offset * (ny + 1);
     }
 
     if (rank != 0)
@@ -338,18 +370,18 @@ void gather()
         nx_out = nx_all / num_procs + (nx_all % num_procs > (rank - 1) ? 1 : 0);
     }
 
-    MPI_Gatherv(h, nx_out * (ny + 1), MPI_DOUBLE, h_all, recvcounts, recdispls_hv, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    MPI_Gatherv(&u[ny + 1], nx_out * (ny + 1), MPI_DOUBLE, u_all, recvcounts, recdispls, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    MPI_Gatherv(v, nx_out * (ny + 1), MPI_DOUBLE, v_all, recvcounts, recdispls_hv, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Gatherv(h, nx_out * (ny + 1), MPI_DOUBLE, h_all, recvcounts_h, recdispls_h, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Gatherv(&u[ny], nx_out * ny, MPI_DOUBLE, u_all, recvcounts_u, recdispls_u, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Gatherv(v, nx_out * (ny + 1), MPI_DOUBLE, v_all, recvcounts_v, recdispls_v, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 }
 
 int t = 0;
 
 void step()
 {
-    MPI_Scatterv(h_all, sendcounts, displs, MPI_DOUBLE, h, nx_in * (ny + 1), MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    MPI_Scatterv(u_all, sendcounts, displs, MPI_DOUBLE, u, nx_in * (ny + 1), MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    MPI_Scatterv(v_all, sendcounts, displs, MPI_DOUBLE, v, nx_in * (ny + 1), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Scatterv(h_all, sendcounts_h, displs_h, MPI_DOUBLE, h, nx_in * (ny + 1), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Scatterv(u_all, sendcounts_u, displs_u, MPI_DOUBLE, u, nx_in * ny, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Scatterv(v_all, sendcounts_v, displs_v, MPI_DOUBLE, v, nx * (ny + 1), MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     if (rank == 0)
     {
@@ -394,8 +426,6 @@ void step()
     swap_buffers();
 
     t++;
-
-
 }
 
 /**
@@ -408,14 +438,21 @@ void free_memory()
 {
     if (rank == 0)
     {
-        free(sendcounts);
-        free(displs);
+        free(sendcounts_h);
+        free(sendcounts_u);
+        free(sendcounts_v);
+        free(displs_h);
+        free(displs_u);
+        free(displs_v);
 
-        free(recvcounts);
-        free(recdispls);
-        free(recdispls_hv);
+        free(recvcounts_h);
+        free(recvcounts_u);
+        free(recvcounts_v);
+        free(recdispls_h);
+        free(recdispls_u);
+        free(recdispls_v);
     }
-    
+
     free(h);
     free(u);
     free(v);

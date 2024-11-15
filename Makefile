@@ -1,7 +1,7 @@
 CPP=CC
 CFLAGS=-lm -fopenmp
 COPTFLAGS=-Ofast -ffast-math -flto -march=native -ftree-vectorize -fprefetch-loop-arrays -funroll-loops -fno-math-errno -falign-loops=32
-OPTFLAGS=-O3 -ffast-math
+OPTFLAGS=-O3 -ffast-math -flto -march=native -ftree-vectorize -fprefetch-loop-arrays -funroll-loops -fno-math-errno -falign-loops=32
 MPIFLAGS=-DMPI
 DEBUGFLAGS=-g -pg
 
